@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>鹿港龍山寺・全 3D 立體紙地圖與雙語國際教育示範 | Lukang Longshan Temple 3D</title>
+    <!-- Tailwind CSS & 思源宋體 / Inter -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Serif+TC:wght@500;700;900&display=swap" rel="stylesheet">
+
+    <!-- Three.js r128 + OrbitControls + 後製微光管線 -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/EffectComposer.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/RenderPass.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/ShaderPass.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/CopyShader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/LuminosityHighPassShader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/UnrealBloomPass.js"></script>
+
+    <!-- JSZip：支援一鍵將所有拆解後的獨立檔案打包成 .zip 下載 -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+
+    <style>
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: #16120f;
+            font-family: 'Noto Serif TC', 'Inter', serif;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        #canvas-container {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 1;
+        }
+
+        /* 深色古銅磨砂玻璃 UI 卡片 (低刺眼、高對比易閱讀) */
+        .paper-glass {
+            background: rgba(24, 19, 16, 0.84);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(226, 178, 110, 0.25);
+            box-shadow: 0 14px 36px rgba(0, 0, 0, 0.55);
+        }
+
+        #cinematic-badge {
+            transition: opacity 0.55s cubic-bezier(0.22, 1, 0.36, 1), transform 0.55s cubic-bezier(0.22, 1, 0.36, 1);
+            text-shadow: 0 4px 18px rgba(0, 0, 0, 0.85);
+        }
+
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+        /* 擲筊翻轉動畫 */
+        @keyframes tossBlockLeft {
+            0% { transform: translateY(0) rotate(0deg) scale(1); }
+            40% { transform: translateY(-48px) rotate(-220deg) scale(1.15); }
+            100% { transform: translateY(0) rotate(-360deg) scale(1); }
+        }
+        @keyframes tossBlockRight {
+            0% { transform: translateY(0) rotate(0deg) scale(1); }
+            45% { transform: translateY(-54px) rotate(240deg) scale(1.15); }
+            100% { transform: translateY(0) rotate(360deg) scale(1); }
+        }
+        .animate-toss-left { animation: tossBlockLeft 0.65s cubic-bezier(0.22, 1, 0.36, 1); }
+        .animate-toss-right { animation: tossBlockRight 0.65s cubic-bezier(0.22, 1, 0.36, 1); }
+    </style>
+</head>
+<body class="text-amber-50 antialiased">
+
+    <!-- 3D 渲染畫布 -->
+    <div id="canvas-container"></div>
+
+    <!-- 頂部控制列：標題 + 雙語教學工具列 -->
+    <header class="fixed top-3 left-3 right-3 z-20 flex flex-wrap items-center justify-between gap-2 pointer-events-none">
+        <!-- 左側品牌標題 -->
+        <div class="paper-glass px-3.5 py-2 rounded-2xl pointer-events-auto flex items-center gap-2.5">
+            <div class="w-9 h-9 rounded-xl bg-[#b83724] text-amber-50 flex items-center justify-center font-black text-sm shadow-inner border border-amber-300/30 shrink-0">
+                龍山
+            </div>
+            <div>
+                <div class="flex items-center gap-2">
+                    <h1 id="ui-main-title" class="text-sm sm:text-base font-black tracking-wider text-amber-50">鹿港龍山寺・3D 雙語文化地圖</h1>
+                    <span class="hidden lg:inline-block text-[10px] px-2 py-0.5 rounded-full bg-amber-400/15 text-amber-200 font-sans font-bold border border-amber-400/30">Modular ES6</span>
+                </div>
+                <p class="text-[11px] text-amber-200/70 font-sans tracking-wide">Lukang Longshan Temple • Low-Key Chiaroscuro Diorama</p>
+            </div>
+        </div>
+
+        <!-- 右側教學功能按鈕列 -->
+        <div class="paper-glass p-1.5 rounded-2xl pointer-events-auto flex flex-wrap items-center gap-1.5">
+            <button id="btn-lang" class="px-2.5 py-1.5 rounded-xl text-xs font-sans font-bold transition-all bg-amber-500/15 text-amber-200 hover:bg-amber-500/25 border border-amber-400/25" title="切換雙語對照或全英文教學模式">
+                🌐 雙語 EN/中
+            </button>
+
+            <button id="btn-explode" class="px-2.5 py-1.5 rounded-xl text-xs font-bold transition-all bg-stone-800/80 text-amber-100 hover:bg-stone-700/80 border border-stone-600/40 flex items-center gap-1" title="升起屋頂，透視內部八卦藻井與無釘斗拱結構">
+                <span>🏛️</span>
+                <span id="txt-explode">屋頂透視</span>
+            </button>
+
+            <button id="btn-open-divine" class="px-2.5 py-1.5 rounded-xl text-xs font-bold transition-all bg-amber-500/20 text-amber-200 hover:bg-amber-500/30 border border-amber-400/30 flex items-center gap-1">
+                <span>🌙</span>
+                <span id="txt-divine">線上擲筊</span>
+            </button>
+
+            <button id="btn-music" class="px-2.5 py-1.5 rounded-xl text-xs font-bold transition-all bg-stone-800/80 text-amber-100 hover:bg-stone-700/80 border border-stone-600/40 flex items-center gap-1" title="播放/暫停南管五聲音階古樂">
+                <span id="icon-music">🎵</span>
+                <span id="txt-music" class="hidden sm:inline">南管古樂</span>
+            </button>
+
+            <div class="w-px h-5 bg-amber-200/20 mx-0.5"></div>
+
+            <button id="btn-tour" class="px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 bg-[#b83724] text-amber-50 shadow-md hover:bg-[#992a1a]">
+                <span id="tour-icon">▶</span>
+                <span id="tour-text">自動巡禮</span>
+            </button>
+
+            <button id="btn-replay" class="px-2.5 py-1.5 rounded-xl text-xs font-bold text-amber-200/80 hover:bg-amber-200/10 transition-all" title="重播宣紙展開與建築生長">
+                ↻
+            </button>
+
+            <!-- 一鍵打包下載整包拆解專案 (.zip) -->
+            <button id="btn-download-zip" class="px-2.5 py-1.5 rounded-xl text-xs font-bold transition-all bg-emerald-700/85 text-emerald-50 hover:bg-emerald-600 border border-emerald-400/30 flex items-center gap-1" title="將 index.html 與 5 個獨立模組打包成 ZIP 下載">
+                <span>📦</span>
+                <span class="hidden sm:inline">打包專案 (.zip)</span>
+            </button>
+        </div>
+    </header>
+
+    <!-- 左下角電影地標字幕 -->
+    <div id="cinematic-badge" class="fixed bottom-20 sm:bottom-24 left-5 sm:left-10 z-20 pointer-events-none opacity-0 translate-y-3">
+        <div class="flex items-center gap-2 mb-1">
+            <span class="inline-block w-2 h-2 rounded-full bg-[#ff5947] shadow-[0_0_12px_#ff5947]"></span>
+            <span id="badge-region" class="text-xs font-bold tracking-[0.18em] text-amber-100 bg-stone-950/80 border border-amber-400/25 px-2.5 py-0.5 rounded backdrop-blur-sm">彰化・鹿港鎮 | Lukang, Changhua</span>
+        </div>
+        <h2 id="badge-title" class="text-2xl sm:text-4xl font-black tracking-wider text-amber-50">山門</h2>
+        <p id="badge-subtitle" class="text-sm sm:text-lg font-sans font-bold tracking-wider text-amber-300 mt-0.5">Shanmen (Main Ceremonial Gate)</p>
+    </div>
+
+    <!-- 右側雙語文化導覽與英語語音朗讀卡片 -->
+    <aside id="info-card" class="fixed right-3 sm:right-4 top-20 z-20 w-[calc(100%-1.5rem)] sm:w-96 paper-glass rounded-2xl p-4 sm:p-5 transition-all duration-500 opacity-0 translate-y-4 pointer-events-none max-h-[72vh] overflow-y-auto no-scrollbar">
+        <div class="flex items-start justify-between gap-2">
+            <div>
+                <span id="card-tag" class="text-[11px] font-sans font-bold tracking-wider text-amber-400 uppercase block">Architectural Highlight 01</span>
+                <h3 id="card-title-zh" class="text-lg sm:text-xl font-black text-amber-50 mt-0.5">山門</h3>
+                <p id="card-title-en" class="text-xs sm:text-sm font-sans text-amber-300/90 font-bold">Shanmen (Main Ceremonial Gate)</p>
+            </div>
+            <button id="btn-close-card" class="w-7 h-7 rounded-full bg-amber-100/10 hover:bg-amber-100/20 flex items-center justify-center text-amber-100 text-xs transition-colors shrink-0">
+                ✕
+            </button>
+        </div>
+
+        <div id="card-vocab-list" class="flex flex-wrap gap-1.5 mt-3"></div>
+        <div class="h-px w-full bg-gradient-to-r from-amber-400/40 via-amber-200/15 to-transparent my-3"></div>
+
+        <!-- 英文導覽解說 + 語音朗讀按鈕 (TTS) -->
+        <div class="bg-black/35 rounded-xl p-3 border border-amber-400/20">
+            <div class="flex items-center justify-between mb-1.5">
+                <span class="text-[11px] font-sans font-bold text-amber-300/80 uppercase tracking-wider">English Guide Script</span>
+                <button id="btn-tts" class="px-2.5 py-1 rounded-lg bg-[#b83724] hover:bg-[#992a1a] text-amber-50 text-xs font-sans font-semibold flex items-center gap-1 shadow-sm transition-all">
+                    <span id="tts-icon">🔊</span>
+                    <span id="tts-label">Listen (EN)</span>
+                </button>
+            </div>
+            <p id="card-desc-en" class="text-xs sm:text-sm font-sans leading-relaxed text-amber-50/95"></p>
+        </div>
+
+        <!-- 中文文史補充 -->
+        <div id="card-zh-block" class="mt-3">
+            <span class="text-[11px] font-bold text-amber-300/70 block mb-1">中文建築與文史賞析</span>
+            <p id="card-desc-zh" class="text-xs leading-relaxed text-stone-200 text-justify"></p>
+        </div>
+
+        <!-- 課堂討論任務提示 -->
+        <div class="mt-3 pt-2.5 border-t border-amber-200/15 flex items-start gap-2 text-xs text-amber-200">
+            <span class="text-sm">💡</span>
+            <p id="card-task-prompt" class="font-sans leading-snug"></p>
+        </div>
+
+        <div class="mt-3 pt-2.5 border-t border-amber-200/15 flex items-center justify-between text-xs">
+            <span id="card-step-indicator" class="font-sans font-semibold text-amber-200/60">1 / 12</span>
+            <button id="btn-next-stop" class="text-amber-300 font-bold hover:underline flex items-center gap-1 font-sans">
+                <span id="txt-next-stop">下一站 Next Stop</span> <span>→</span>
+            </button>
+        </div>
+    </aside>
+
+    <!-- 線上雙語擲筊求籤互動視窗 -->
+    <div id="divination-modal" class="fixed inset-0 z-30 bg-black/75 backdrop-blur-sm hidden items-center justify-center p-4">
+        <div class="paper-glass rounded-3xl max-w-md w-full p-6 relative shadow-2xl border border-amber-400/35">
+            <button id="btn-close-divine" class="absolute top-4 right-4 w-8 h-8 rounded-full bg-amber-100/10 hover:bg-amber-100/20 flex items-center justify-center text-amber-100 font-bold">✕</button>
+
+            <div class="text-center">
+                <span class="text-xs font-sans font-bold tracking-widest text-amber-400 uppercase">Cultural Experience • 傳統信仰體驗</span>
+                <h3 class="text-xl font-black text-amber-50 mt-1">線上雙語擲筊求籤</h3>
+                <p class="text-xs font-sans text-amber-200/75 mt-0.5">Traditional Moon Blocks (Jiaobei) Divination</p>
+            </div>
+
+            <div class="my-6 flex items-center justify-center gap-6 h-28 bg-black/40 rounded-2xl border border-amber-400/20">
+                <div id="moon-block-left" class="w-16 h-20 flex items-center justify-center">
+                    <svg viewBox="0 0 80 100" class="w-full h-full drop-shadow-lg">
+                        <path d="M55,10 C20,15 10,50 20,85 C25,95 45,90 50,75 C42,50 48,25 60,15 Z" fill="#b8291a" stroke="#f5c85c" stroke-width="2.5"/>
+                        <path d="M55,10 C48,35 45,65 50,75" fill="none" stroke="#ff7961" stroke-width="2" opacity="0.6"/>
+                    </svg>
+                </div>
+                <div id="moon-block-right" class="w-16 h-20 flex items-center justify-center">
+                    <svg viewBox="0 0 80 100" class="w-full h-full drop-shadow-lg">
+                        <path d="M25,10 C60,15 70,50 60,85 C55,95 35,90 30,75 C38,50 32,25 20,15 Z" fill="#d97b38" stroke="#f5c85c" stroke-width="2.5"/>
+                        <path d="M25,10 C32,35 35,65 30,75" fill="none" stroke="#ffe0b2" stroke-width="2" opacity="0.7"/>
+                    </svg>
+                </div>
+            </div>
+
+            <div class="text-center">
+                <button id="btn-toss-blocks" class="w-full py-3 rounded-2xl bg-[#b83724] hover:bg-[#992a1a] text-amber-50 font-bold text-sm shadow-lg transition-all border border-amber-300/30">
+                    🙏 誠心祈願並擲筊 (Toss Moon Blocks)
+                </button>
+            </div>
+
+            <div id="fortune-result" class="hidden mt-4 p-4 rounded-2xl bg-amber-950/50 border border-amber-400/35 text-center">
+                <span id="fortune-type" class="inline-block px-3 py-0.5 rounded-full bg-amber-400/20 text-amber-300 text-xs font-sans font-bold mb-2">聖筊 Shengjiao</span>
+                <p id="fortune-en" class="text-xs sm:text-sm font-sans font-semibold text-amber-50 leading-relaxed"></p>
+                <p id="fortune-zh" class="text-xs text-amber-200/85 mt-1.5 leading-relaxed"></p>
+            </div>
+        </div>
+    </div>
+
+    <!-- 底部 12 大建築與官網文物亮點導覽列 (由 engine.js 依據 config.js 動態生成) -->
+    <nav class="fixed bottom-3 left-3 right-3 z-20 flex flex-col items-center pointer-events-none">
+        <div id="bottom-nav-bar" class="paper-glass p-1.5 rounded-2xl pointer-events-auto max-w-full overflow-x-auto no-scrollbar flex items-center gap-1">
+            <!-- 導覽按鈕由 engine.js 自動填入 -->
+        </div>
+    </nav>
+
+    <!-- 載入主模組引擎 (自動匯入 config.js, materials.js, components.js, architecture.js) -->
+    <script type="module" src="./engine.js"></script>
+</body>
+</html>
