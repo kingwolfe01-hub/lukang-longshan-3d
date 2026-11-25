@@ -24,11 +24,12 @@ const AppState = {
     clock: new THREE.Clock()
 };
 
-// 聲音與英語語音朗讀系統
+// 聲音與真實語音 MP3 播放系統（優先播放本地 ./audio/*.mp3，找不到檔案時自動啟用瀏覽器 TTS 備援）
 const AudioSystem = {
     audioCtx: null,
     timer: null,
     isPlaying: false,
+    currentAudio: null,
 
     toggleNanguan() {
         const btn = document.getElementById('btn-music');
@@ -82,12 +83,66 @@ const AudioSystem = {
         this.timer = setInterval(playNote, tempoMs);
     },
 
-    speakEnglish(text) {
+    stopCurrentAudio() {
+        if (this.currentAudio) {
+            this.currentAudio.pause();
+            this.currentAudio = null;
+        }
+        if ('speechSynthesis' in window) {
+            window.speechSynthesis.cancel();
+        }
+    },
+
+    playLandmarkAudio(landmarkIndex, isEnglish = true) {
+        this.stopCurrentAudio();
+        const fileNum = String(landmarkIndex + 1).padStart(2, '0');
+        const langSuffix = isEnglish ? 'en' : 'zh';
+        const audioPath = `./audio/landmark_${fileNum}_${langSuffix}.mp3`;
+        const label = document.getElementById('tts-label');
+
+        const audio = new Audio(audioPath);
+        this.currentAudio = audio;
+        if (label) label.textContent = 'Loading...';
+
+        audio.onplay = () => { if (label) label.textContent = 'Playing...'; };
+        audio.onended = () => { if (label) label.textContent = 'Listen (EN)'; this.currentAudio = null; };
+        audio.onerror = () => {
+            const mod = APP_CONFIG.landmarks[landmarkIndex];
+            this.speakText(isEnglish ? `${mod.titleEn}. ${mod.descEn}` : `${mod.titleZh}。${mod.descZh}`, isEnglish ? 'en-US' : 'zh-TW');
+            this.currentAudio = null;
+        };
+        audio.play().catch(() => {
+            const mod = APP_CONFIG.landmarks[landmarkIndex];
+            this.speakText(isEnglish ? `${mod.titleEn}. ${mod.descEn}` : `${mod.titleZh}。${mod.descZh}`, isEnglish ? 'en-US' : 'zh-TW');
+        });
+    },
+
+    playFortuneAudio(slipIndex, isEnglish = true) {
+        this.stopCurrentAudio();
+        const fileNum = String(slipIndex + 1).padStart(2, '0');
+        const langSuffix = isEnglish ? 'en' : 'zh';
+        const audioPath = `./audio/fortune_${fileNum}_${langSuffix}.mp3`;
+
+        const audio = new Audio(audioPath);
+        this.currentAudio = audio;
+        audio.onended = () => { this.currentAudio = null; };
+        audio.onerror = () => {
+            const slip = APP_CONFIG.fortuneSlips[slipIndex];
+            this.speakText(isEnglish ? slip.en.replace(/"/g, '') : slip.zh, isEnglish ? 'en-US' : 'zh-TW');
+            this.currentAudio = null;
+        };
+        audio.play().catch(() => {
+            const slip = APP_CONFIG.fortuneSlips[slipIndex];
+            this.speakText(isEnglish ? slip.en.replace(/"/g, '') : slip.zh, isEnglish ? 'en-US' : 'zh-TW');
+        });
+    },
+
+    speakText(text, lang = 'en-US') {
         if (!('speechSynthesis' in window)) return;
         window.speechSynthesis.cancel();
 
         const utterance = new SpeechSynthesisUtterance(text);
-        utterance.lang = 'en-US';
+        utterance.lang = lang;
         utterance.rate = 0.92;
 
         const label = document.getElementById('tts-label');
@@ -248,11 +303,13 @@ const UIController = {
 
         setTimeout(() => {
             const slips = APP_CONFIG.fortuneSlips;
-            const slip = slips[Math.floor(Math.random() * slips.length)];
+            const slipIdx = Math.floor(Math.random() * slips.length);
+            const slip = slips[slipIdx];
             document.getElementById('fortune-type').textContent = slip.type;
             document.getElementById('fortune-en').textContent = slip.en;
             document.getElementById('fortune-zh').textContent = slip.zh;
             resultBox.classList.remove('hidden');
+            AudioSystem.playFortuneAudio(slipIdx, true);
         }, 620);
     },
 
@@ -524,8 +581,7 @@ const SceneEngine = {
         });
         document.getElementById('btn-tts').addEventListener('click', () => {
             const idx = AppState.activeLandmark >= 0 ? AppState.activeLandmark : 0;
-            const mod = APP_CONFIG.landmarks[idx];
-            AudioSystem.speakEnglish(`${mod.titleEn}. ${mod.descEn}`);
+            AudioSystem.playLandmarkAudio(idx, true);
         });
 
         const raycaster = new THREE.Raycaster();

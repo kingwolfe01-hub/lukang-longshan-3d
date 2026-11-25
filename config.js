@@ -22,22 +22,43 @@ export const APP_CONFIG = {
         tempoMs: 780
     },
 
-    // 1.3 線上擲筊雙語籤詩庫 (國小暖心正能量童趣版)
+    // 1.3 線上擲筊雙語籤詩庫 (國小暖心正能量童趣版 - 完整 6 首對應 fortune_01~06.mp3)
     fortuneSlips: [
         {
+            id: 1,
             type: "聖筊 Shengjiao (一平一凸 — 神明說 YES！)",
             en: "\"You are a super learner! Just like a brave little fish jumping over the Dragon Gate, you can do anything!\"",
             zh: "「學習小超人籤：你就像勇敢跳過龍門的小鯉魚，今天上課一定超棒、難不倒你！」"
         },
         {
-            type: "聖筊 Shengjiao (好運滿滿 — 大吉大利！)",
+            id: 2,
+            type: "聖筊 Shengjiao (大吉大利 — 小小外交官！)",
             en: "\"Keep smiling and stay curious! Share the fun stories of Lukang with your friends around the world!\"",
             zh: "「快樂探索家籤：保持滿滿的好奇心！把鹿港龍山寺的有趣故事分享給全世界的朋友吧！」"
         },
         {
+            id: 3,
+            type: "聖筊 Shengjiao (好運滿滿 — 勇氣大冒險！)",
+            en: "\"Raise your hand, speak English loudly, and shine like a star today!\"",
+            zh: "「勇氣大冒險籤：你有一顆勇敢又善良的心，今天大膽舉手、大聲說英文，你一定會像星星一樣閃亮！」"
+        },
+        {
+            id: 4,
             type: "笑筊 Xiaojiao (兩個平面 — 神明笑嘻嘻！)",
             en: "\"The temple gods are smiling at you! Take a deep breath, have fun, and try asking again!\"",
             zh: "「神明笑嘻嘻籤：神明對你露出溫暖的微笑喔！放輕鬆、開心地探索每一個小角落吧！」"
+        },
+        {
+            id: 5,
+            type: "笑筊 Xiaojiao (神明好開心 — 快樂開心果！)",
+            en: "\"Your question makes the gods very happy! Share a big smile with your classmates right now!\"",
+            zh: "「快樂開心果籤：你的問題讓神明笑得合不攏嘴呢！現在就轉頭對旁邊的同學露出一個大大的微笑吧！」"
+        },
+        {
+            id: 6,
+            type: "陰筊 Yinjiao (兩個凸面 — 再接再厲小勇士！)",
+            en: "\"Don't worry, little hero! Every great explorer tries again. Take a closer look and toss the blocks one more time!\"",
+            zh: "「再接再厲小勇士籤：別灰心喔小勇士！每個厲害的探險家都會多試幾次，再仔細觀察一下寺廟，重新擲筊問問看吧！」"
         }
     ],
 
